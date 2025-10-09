@@ -21,6 +21,9 @@ typedef enum {
     EV_MARIADB
 } EventType_t;
 
+void freertos_task_init(void);
+void freertos_queue_init(void);
+
 void taskMaster(void *pvParameters);
 void taskSensorRead(void *pvParameters);
 void taskSerialPrint(void *pvParameters);
@@ -39,8 +42,19 @@ void setup() {
         Serial.println("BMP280 init failed!");
     }
 
-    eventQueue = xQueueCreate(10, sizeof(EventType_t));
+    freertos_queue_init();
+    freertos_task_init();
+}
 
+void loop() {
+    // Nothing to do here; all handled by tasks
+}
+
+void freertos_queue_init(void){
+    eventQueue = xQueueCreate(10, sizeof(EventType_t));
+}
+
+void freertos_task_init(void){
     xTaskCreate(
         taskMaster,
         "masterControllerTask",
@@ -76,10 +90,6 @@ void setup() {
         2,
         NULL
     );
-}
-
-void loop() {
-    // Nothing to do here; all handled by tasks
 }
 
 void taskMaster(void *pvParameters) {
