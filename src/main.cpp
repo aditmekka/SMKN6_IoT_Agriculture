@@ -28,6 +28,7 @@ void taskEnvSensor(void *pvParameters);
 
 void setup() {
     Serial.begin(115200);
+    Wire.begin();
     pinMode(MQ_PIN, INPUT);
     pinMode(SOILC_PIN, INPUT);
 
@@ -137,6 +138,7 @@ void taskEnvSensor(void *pvParameters) {
     for (;;) {
         AHT20_Measure();
         BMP280_Read();
+        BMP280_ReadAltitude(1013.25);
 
         temp = AHT20_Temperature;
         hum = AHT20_Humidity;
@@ -147,23 +149,29 @@ void taskEnvSensor(void *pvParameters) {
 
 void taskSerialPrint(void *pvParameters) {
     EventType_t evt;
+
     for (;;) {
-        if (xQueueReceive(eventQueue, &evt, portMAX_DELAY) == pdPASS) {
-            if (evt == EV_SERIAL_PRINT) {
-                Serial.print("Temperature: ");
-                Serial.print(temp);
-                Serial.print(" °C, Humidity: ");
-                Serial.print(hum);
-                Serial.print(" %, Pressure: ");
-                Serial.print(BMP280_Pressure);
-                Serial.print(" Pa, Approx Altitude: ");
-                Serial.print(BMP280_Altitude);
-                Serial.print(" m, Soil Moisture: ");
-                Serial.print(soil_val);
-                Serial.print(" %, PPM: ");
-                Serial.print(mq_val);
-                Serial.println(" %");
-            }
+        if (xQueueReceive(eventQueue, &evt, portMAX_DELAY) != pdPASS) {
+            continue;
         }
+
+        if (evt != EV_SERIAL_PRINT) {
+            continue;
+        }
+
+        Serial.print("Temperature: ");
+        Serial.print(temp);
+        Serial.print(" °C, Humidity: ");
+        Serial.print(hum);
+        Serial.print(" %, Pressure: ");
+        Serial.print(BMP280_Pressure);
+        Serial.print(" Pa, Approx Altitude: ");
+        Serial.print(BMP280_Altitude);
+        Serial.print(" m, Soil Moisture: ");
+        Serial.print(soil_val);
+        Serial.print(" %, PPM: ");
+        Serial.print(mq_val);
+        Serial.println(" %");
     }
 }
+

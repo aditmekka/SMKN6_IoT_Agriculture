@@ -38,7 +38,7 @@
 
 /* --- I2C Addresses --- */
 #define AHT20_ADDRESS   0x38
-#define BMP280_ADDRESS  0x76  // some modules use 0x77
+#define BMP280_ADDRESS  0x77
 
 /* --- Public Variables --- */
 extern float AHT20_Temperature;
