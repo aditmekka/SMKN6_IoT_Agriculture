@@ -4,39 +4,49 @@
 #include "freertos/queue.h"
 #include <WiFi.h>
 #include <AHT20_BMP280.h>
+#include <ADS1115.h>
 
 QueueHandle_t eventQueue;
 QueueHandle_t databaseQueue;
 
-#define MQ_PIN      34
-#define SOILC_PIN   35
+ADS1115_t ads1;
+ADS1115_t ads2;
 
-uint16_t mq_val, soil_val, prev_mq, prev_soil, old_mq, old_soil;
-float old_tem, old_hum;
-float alpha = 0.95;
-float hum, temp;
+typedef struct {
+    float temperature;
+    float humidity;
+    float pressure;
+    float altitude;
+    uint16_t soilMoisture1;
+    uint16_t soilMoisture2;
+    uint16_t soilMoisture3;
+    uint16_t soilMoisture4;
+    uint16_t soilMoisture5;
+    uint16_t airQuality;
+    uint16_t rainLevel;
+} SensorData_t;
 
-typedef enum {
-    EV_READ_SENSOR,
-    EV_SERIAL_PRINT,
-    EV_FIREBASE,
-    EV_MARIADB
-} EventType_t;
+SensorData_t sensorData;
+
+void ads1115_init(void);
 
 void freertos_task_init(void);
 void freertos_queue_init(void);
 
+void read_analog_sensor(void);
+void read_i2c_sensor(void);
+void wifi_manager(void);
+
 void task_wifi_manager(void *pvParameters);
-void taskMaster(void *pvParameters);
-void taskSensorRead(void *pvParameters);
-void taskSerialPrint(void *pvParameters);
-void taskEnvSensor(void *pvParameters);
+void task_analog_sensor(void *pvParameters);
+void task_serial_print(void *pvParameters);
+void task_i2c_sensor(void *pvParameters);
 
 void setup() {
     Serial.begin(115200);
     Wire.begin();
-    pinMode(MQ_PIN, INPUT);
-    pinMode(SOILC_PIN, INPUT);
+
+    ads1115_init();
 
     if (!AHT20_Init()) {
         Serial.println("AHT20 init failed!");
@@ -54,21 +64,12 @@ void loop() {
 }
 
 void freertos_queue_init(void){
-    eventQueue = xQueueCreate(10, sizeof(EventType_t));
+    // eventQueue = xQueueCreate(10, sizeof(EventType_t));
 }
 
 void freertos_task_init(void){
     xTaskCreate(
         task_wifi_manager,
-        "WifiManager",
-        2048,
-        NULL,
-        24,
-        NULL
-    );
-
-    xTaskCreate(
-        taskMaster,
         "masterControllerTask",
         2048,
         NULL,
@@ -77,7 +78,7 @@ void freertos_task_init(void){
     );
 
     xTaskCreate(
-        taskSensorRead,
+        task_analog_sensor,
         "sensorReadTask",
         2048,
         NULL,
@@ -86,7 +87,7 @@ void freertos_task_init(void){
     );
 
     xTaskCreate(
-        taskSerialPrint,
+        task_serial_print,
         "serialPrintTask",
         2048,
         NULL,
@@ -95,13 +96,42 @@ void freertos_task_init(void){
     );
 
     xTaskCreate(
-        taskEnvSensor,
+        task_i2c_sensor,
         "EnvSensorTask",
         2048,
         NULL,
         2,
         NULL
     );
+}
+
+void ads1115_init(void){
+    ADS1115_begin(&ads1, &Wire, ADS1115_ADDR_GND);
+    ADS1115_begin(&ads2, &Wire, ADS1115_ADDR_VDD);
+
+    ADS1115_setGain(&ads1, ADS1115_PGA_2_048V);
+    ADS1115_setDataRate(&ads1, ADS1115_DR_128SPS);
+}
+
+void read_analog_sensor(void){
+    sensorData.soilMoisture1 = ADS1115_readVoltage(&ads1, ADS1115_MUX_SINGLE_0);
+    sensorData.soilMoisture2 = ADS1115_readVoltage(&ads1, ADS1115_MUX_SINGLE_1);
+    sensorData.soilMoisture3 = ADS1115_readVoltage(&ads1, ADS1115_MUX_SINGLE_2);
+    sensorData.soilMoisture4 = ADS1115_readVoltage(&ads1, ADS1115_MUX_SINGLE_3);
+
+    sensorData.airQuality = ADS1115_readVoltage(&ads2, ADS1115_MUX_SINGLE_0);
+    sensorData.rainLevel = ADS1115_readVoltage(&ads2, ADS1115_MUX_SINGLE_1);
+}
+
+void read_i2c_sensor(void){
+    AHT20_Measure();
+    BMP280_Read();
+    BMP280_ReadAltitude(1013.25);
+
+    sensorData.temperature = AHT20_Temperature;
+    sensorData.humidity = AHT20_Humidity;
+    sensorData.pressure = BMP280_Pressure;
+    sensorData.altitude = BMP280_Altitude;
 }
 
 void wifi_manager(){
@@ -118,96 +148,45 @@ void task_wifi_manager(void *pvParameters){
     }
 }
 
-void taskMaster(void *pvParameters) {
-    EventType_t evt;
-
-    const uint16_t MQ_THRESHOLD = 2;
-    const uint16_t SOIL_THRESHOLD = 2;
-    const float TEMP_THRESHOLD = 0.5;
-    const float HUM_THRESHOLD = 1.0;
-
+void task_analog_sensor(void *pvParameters) {
     for (;;) {
-        bool shouldPrint = false;
-
-        if (abs((int16_t)(mq_val - old_mq)) >= MQ_THRESHOLD) {
-            old_mq = mq_val;
-            shouldPrint = true;
-        }
-
-        if (abs((int16_t)(soil_val - old_soil)) >= SOIL_THRESHOLD) {
-            old_soil = soil_val;
-            shouldPrint = true;
-        }
-
-        if (fabs(temp - old_tem) >= TEMP_THRESHOLD) {
-            old_tem = temp;
-            shouldPrint = true;
-        }
-
-        if (fabs(hum - old_hum) >= HUM_THRESHOLD) {
-            old_hum = hum;
-            shouldPrint = true;
-        }
-
-        if (shouldPrint) {
-            evt = EV_SERIAL_PRINT;
-            xQueueSend(eventQueue, &evt, 0);
-        }
-
+        read_analog_sensor();
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
-void taskSensorRead(void *pvParameters) {
+void task_i2c_sensor(void *pvParameters) {
     for (;;) {
-        mq_val = map((analogRead(MQ_PIN) + prev_mq / 2), 0, 4095, 0, 100);
-        prev_mq = mq_val;
-
-        soil_val = map((analogRead(SOILC_PIN) + prev_soil / 2), 0, 4095, 0, 100);
-        prev_soil = soil_val;
-
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-}
-
-void taskEnvSensor(void *pvParameters) {
-    for (;;) {
-        AHT20_Measure();
-        BMP280_Read();
-        BMP280_ReadAltitude(1013.25);
-
-        temp = AHT20_Temperature;
-        hum = AHT20_Humidity;
-
+        read_i2c_sensor();
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
-void taskSerialPrint(void *pvParameters) {
-    EventType_t evt;
+void task_serial_print(void *pvParameters) {
+    // EventType_t evt;
 
     for (;;) {
-        if (xQueueReceive(eventQueue, &evt, portMAX_DELAY) != pdPASS) {
-            continue;
-        }
+        // if (xQueueReceive(eventQueue, &evt, portMAX_DELAY) != pdPASS) {
+        //     continue;
+        // }
 
-        if (evt != EV_SERIAL_PRINT) {
-            continue;
-        }
+        // if (evt != EV_SERIAL_PRINT) {
+        //     continue;
+        // }
 
-        Serial.print("Temperature: ");
-        Serial.print(temp);
-        Serial.print(" °C, Humidity: ");
-        Serial.print(hum);
-        Serial.print(" %, Pressure: ");
-        Serial.print(BMP280_Pressure);
-        Serial.print(" Pa, Approx Altitude: ");
-        Serial.print(BMP280_Altitude);
-        Serial.print(" m, Soil Moisture: ");
-        Serial.print(soil_val);
-        Serial.print(" %, PPM: ");
-        Serial.print(mq_val);
-        Serial.println(" %");
+        // Serial.print("Temperature: ");
+        // Serial.print(temp);
+        // Serial.print(" °C, Humidity: ");
+        // Serial.print(hum);
+        // Serial.print(" %, Pressure: ");
+        // Serial.print(BMP280_Pressure);
+        // Serial.print(" Pa, Approx Altitude: ");
+        // Serial.print(BMP280_Altitude);
+        // Serial.print(" m, Soil Moisture: ");
+        // Serial.print(soil_val);
+        // Serial.print(" %, PPM: ");
+        // Serial.print(mq_val);
+        // Serial.println(" %");
     }
 }
 
