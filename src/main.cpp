@@ -2,9 +2,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include <WiFi.h>
 #include <AHT20_BMP280.h>
 
 QueueHandle_t eventQueue;
+QueueHandle_t databaseQueue;
 
 #define MQ_PIN      34
 #define SOILC_PIN   35
@@ -24,6 +26,7 @@ typedef enum {
 void freertos_task_init(void);
 void freertos_queue_init(void);
 
+void task_wifi_manager(void *pvParameters);
 void taskMaster(void *pvParameters);
 void taskSensorRead(void *pvParameters);
 void taskSerialPrint(void *pvParameters);
@@ -55,6 +58,15 @@ void freertos_queue_init(void){
 }
 
 void freertos_task_init(void){
+    xTaskCreate(
+        task_wifi_manager,
+        "WifiManager",
+        2048,
+        NULL,
+        24,
+        NULL
+    );
+
     xTaskCreate(
         taskMaster,
         "masterControllerTask",
@@ -90,6 +102,20 @@ void freertos_task_init(void){
         2,
         NULL
     );
+}
+
+void wifi_manager(){
+    
+}
+
+void task_wifi_manager(void *pvParameters){
+    for(;;){
+        if(WiFi.status() != WL_CONNECTED){
+            wifi_manager();
+        }else{
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+        }
+    }
 }
 
 void taskMaster(void *pvParameters) {
