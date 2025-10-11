@@ -9,15 +9,15 @@
 QueueHandle_t eventQueue;
 QueueHandle_t databaseQueue;
 
-ADS1115_t ads1;
-ADS1115_t ads2;
+ADS1115 ads1(0x48);
+ADS1115 ads2(0x49);
 
 typedef struct {
     float temperature;
     float humidity;
     float pressure;
     float altitude;
-    uint16_t soilMoisture1;
+    float soilMoisture1;
     uint16_t soilMoisture2;
     uint16_t soilMoisture3;
     uint16_t soilMoisture4;
@@ -70,7 +70,7 @@ void freertos_queue_init(void){
 void freertos_task_init(void){
     xTaskCreate(
         task_wifi_manager,
-        "masterControllerTask",
+        "wifi_manager",
         2048,
         NULL,
         24,
@@ -79,7 +79,7 @@ void freertos_task_init(void){
 
     xTaskCreate(
         task_analog_sensor,
-        "sensorReadTask",
+        "analog_sensor",
         2048,
         NULL,
         23,
@@ -97,7 +97,7 @@ void freertos_task_init(void){
 
     xTaskCreate(
         task_i2c_sensor,
-        "EnvSensorTask",
+        "i2c_sensor",
         2048,
         NULL,
         2,
@@ -106,21 +106,22 @@ void freertos_task_init(void){
 }
 
 void ads1115_init(void){
-    ADS1115_begin(&ads1, &Wire, ADS1115_ADDR_GND);
-    ADS1115_begin(&ads2, &Wire, ADS1115_ADDR_VDD);
-
-    ADS1115_setGain(&ads1, ADS1115_PGA_2_048V);
-    ADS1115_setDataRate(&ads1, ADS1115_DR_128SPS);
+    ads1.setGain(GAIN_ONE);
+    ads2.setGain(GAIN_ONE);
+    ads1.setDataRate(RATE_250SPS);
+    ads2.setDataRate(RATE_250SPS);
 }
 
 void read_analog_sensor(void){
-    sensorData.soilMoisture1 = ADS1115_readVoltage(&ads1, ADS1115_MUX_SINGLE_0);
-    sensorData.soilMoisture2 = ADS1115_readVoltage(&ads1, ADS1115_MUX_SINGLE_1);
-    sensorData.soilMoisture3 = ADS1115_readVoltage(&ads1, ADS1115_MUX_SINGLE_2);
-    sensorData.soilMoisture4 = ADS1115_readVoltage(&ads1, ADS1115_MUX_SINGLE_3);
+    sensorData.soilMoisture1 = (ads1.readVoltage(0)/ 3.3f) * 100.0f;
+    sensorData.soilMoisture2 = ads1.readVoltage(1);
+    sensorData.soilMoisture3 = ads1.readVoltage(2);
+    sensorData.soilMoisture4 = ads1.readVoltage(3);
 
-    sensorData.airQuality = ADS1115_readVoltage(&ads2, ADS1115_MUX_SINGLE_0);
-    sensorData.rainLevel = ADS1115_readVoltage(&ads2, ADS1115_MUX_SINGLE_1);
+    if(ads2.begin()){
+        sensorData.airQuality = ads2.readVoltage(0);
+        sensorData.rainLevel = ads2.readVoltage(1);
+    }
 }
 
 void read_i2c_sensor(void){
@@ -140,11 +141,12 @@ void wifi_manager(){
 
 void task_wifi_manager(void *pvParameters){
     for(;;){
-        if(WiFi.status() != WL_CONNECTED){
-            wifi_manager();
-        }else{
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
-        }
+        // if(WiFi.status() != WL_CONNECTED){
+        //     wifi_manager();
+        // }else{
+        //     vTaskDelay(5000 / portTICK_PERIOD_MS);
+        // }
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -174,19 +176,21 @@ void task_serial_print(void *pvParameters) {
         //     continue;
         // }
 
-        // Serial.print("Temperature: ");
-        // Serial.print(temp);
-        // Serial.print(" °C, Humidity: ");
-        // Serial.print(hum);
-        // Serial.print(" %, Pressure: ");
-        // Serial.print(BMP280_Pressure);
-        // Serial.print(" Pa, Approx Altitude: ");
-        // Serial.print(BMP280_Altitude);
-        // Serial.print(" m, Soil Moisture: ");
-        // Serial.print(soil_val);
-        // Serial.print(" %, PPM: ");
-        // Serial.print(mq_val);
-        // Serial.println(" %");
+        Serial.print("Temperature: ");
+        Serial.print(sensorData.temperature);
+        Serial.print(" °C, Humidity: ");
+        Serial.print(sensorData.humidity);
+        Serial.print(" %, Pressure: ");
+        Serial.print(sensorData.pressure);
+        Serial.print(" Pa, Approx Altitude: ");
+        Serial.print(sensorData.altitude);
+        Serial.print(" m, Soil Moisture: ");
+        Serial.print(sensorData.soilMoisture1);
+        Serial.print(" %, PPM: ");
+        Serial.print(sensorData.airQuality);
+        Serial.println(" %");
+
+        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
 
