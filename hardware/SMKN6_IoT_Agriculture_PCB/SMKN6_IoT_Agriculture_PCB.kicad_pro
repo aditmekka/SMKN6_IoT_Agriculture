@@ -1,6 +1,9 @@
 {
   "board": {
+<<<<<<< HEAD
     "3dviewports": [],
+=======
+>>>>>>> c9b0e23 (Move PlatformIO project into /firmware folder and add /hardware folder for future pcb design)
     "design_settings": {
       "defaults": {},
       "diff_pair_dimensions": [],
@@ -8,6 +11,7 @@
       "rules": {},
       "track_widths": [],
       "via_dimensions": []
+<<<<<<< HEAD
     },
     "ipc2581": {
       "dist": "",
@@ -24,11 +28,17 @@
   "cvpcb": {
     "equivalence_files": []
   },
+=======
+    }
+  },
+  "boards": [],
+>>>>>>> c9b0e23 (Move PlatformIO project into /firmware folder and add /hardware folder for future pcb design)
   "libraries": {
     "pinned_footprint_libs": [],
     "pinned_symbol_libs": []
   },
   "meta": {
+<<<<<<< HEAD
     "filename": "SMKN6_IoT_Agriculture_PCB.kicad_pro",
     "version": 3
   },
@@ -78,6 +88,20 @@
     "legacy_lib_dir": "",
     "legacy_lib_list": []
   },
+=======
+    "filename": "kicad.kicad_pro",
+    "version": 1
+  },
+  "net_settings": {
+    "classes": [],
+    "meta": {
+      "version": 0
+    }
+  },
+  "pcbnew": {
+    "page_layout_descr_file": ""
+  },
+>>>>>>> c9b0e23 (Move PlatformIO project into /firmware folder and add /hardware folder for future pcb design)
   "sheets": [],
   "text_variables": {}
 }
