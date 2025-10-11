@@ -1,3 +1,31 @@
+/**
+ ******************************************************************************
+ * @file    ADS1115.cpp
+ * @brief   Driver for ADS1115 Analog to I2C Multiplexer.
+ * @author  aditmekka
+ * @version 1.0
+ * @date    October 2025
+ * @license MIT License (Free to use with attribution)
+ *
+ * @details
+ *
+ * ----------------------------------------------------------------------------
+ * Original MIT License:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ *
+ ******************************************************************************
+ */
+
 #include "ADS1115.h"
 
 ADS1115::ADS1115(uint8_t addr, TwoWire *wirePort)
