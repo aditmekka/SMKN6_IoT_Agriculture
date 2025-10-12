@@ -3,8 +3,14 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include <WiFi.h>
+#include <WiFiManager.h>
 #include <AHT20_BMP280.h>
 #include <ADS1115.h>
+
+static EventGroupHandle_t wifiEventGroup;
+#define WIFI_CONNECTED_BIT (1 << 0)
+
+TaskHandle_t xTaskWifiManager, xTaskSensorI2C, xTaskSensorAnalog, xTaskSerialPrint;
 
 QueueHandle_t eventQueue;
 QueueHandle_t databaseQueue;
@@ -28,10 +34,13 @@ typedef struct {
 
 SensorData_t sensorData;
 
+bool lastConnected = false;
+
 void ads1115_init(void);
 
 void freertos_task_init(void);
 void freertos_queue_init(void);
+void freertos_event_init(void);
 
 void read_analog_sensor(void);
 void read_i2c_sensor(void);
@@ -43,18 +52,15 @@ void task_serial_print(void *pvParameters);
 void task_i2c_sensor(void *pvParameters);
 
 void setup() {
+    WiFi.mode(WIFI_STA);
     Serial.begin(115200);
     Wire.begin();
 
     ads1115_init();
+    if (!AHT20_Init()) Serial.println("AHT20 init failed!");
+    if (!BMP280_Init()) Serial.println("BMP280 init failed!");
 
-    if (!AHT20_Init()) {
-        Serial.println("AHT20 init failed!");
-    }
-    if (!BMP280_Init()) {
-        Serial.println("BMP280 init failed!");
-    }
-
+    freertos_event_init();
     freertos_queue_init();
     freertos_task_init();
 }
@@ -67,14 +73,18 @@ void freertos_queue_init(void){
     // eventQueue = xQueueCreate(10, sizeof(EventType_t));
 }
 
+void freertos_event_init(void){
+    wifiEventGroup = xEventGroupCreate();
+}
+
 void freertos_task_init(void){
     xTaskCreate(
         task_wifi_manager,
         "wifi_manager",
-        2048,
+        8192,
         NULL,
-        24,
-        NULL
+        5,
+        &xTaskWifiManager
     );
 
     xTaskCreate(
@@ -82,8 +92,8 @@ void freertos_task_init(void){
         "analog_sensor",
         2048,
         NULL,
-        23,
-        NULL
+        2,
+        &xTaskSensorAnalog
     );
 
     xTaskCreate(
@@ -92,7 +102,7 @@ void freertos_task_init(void){
         2048,
         NULL,
         2,
-        NULL
+        &xTaskSerialPrint
     );
 
     xTaskCreate(
@@ -101,8 +111,22 @@ void freertos_task_init(void){
         2048,
         NULL,
         2,
-        NULL
+        &xTaskSensorI2C
     );
+}
+
+void setTaskStates(bool wifiConnected) {
+    if (wifiConnected) {
+        vTaskResume(xTaskSensorI2C);
+        vTaskResume(xTaskSensorAnalog);
+        // vTaskResume(xTaskActuator);
+        vTaskResume(xTaskSerialPrint);
+    } else {
+        vTaskSuspend(xTaskSensorI2C);
+        vTaskSuspend(xTaskSensorAnalog);
+        // vTaskSuspend(xTaskActuator);
+        vTaskSuspend(xTaskSerialPrint);
+    }
 }
 
 void ads1115_init(void){
@@ -135,18 +159,59 @@ void read_i2c_sensor(void){
     sensorData.altitude = BMP280_Altitude;
 }
 
-void wifi_manager(){
-    
-}
+void task_wifi_manager(void *pvParameters) {
+    WiFiManager wm;
+    wm.setDebugOutput(true);
 
-void task_wifi_manager(void *pvParameters){
-    for(;;){
-        // if(WiFi.status() != WL_CONNECTED){
-        //     wifi_manager();
-        // }else{
-        //     vTaskDelay(5000 / portTICK_PERIOD_MS);
-        // }
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    wm.setConfigPortalBlocking(false);
+    wm.setShowInfoUpdate(true);
+    wm.setConnectTimeout(15);           // seconds to try connecting before starting AP
+    wm.setConfigPortalTimeout(300);     // portal closes after 5 minutes if idle
+
+    wm.setTitle("SMKN6 IoT Agriculture WiFi Setup");
+
+    // Uncomment for testing purpose:
+    //wm.resetSettings();
+
+    bool ok = wm.autoConnect();
+    if (!ok) {
+        Serial.println("WiFiMgr: Failed to auto-connect, starting AP portal...");
+
+        WiFi.mode(WIFI_AP);
+        WiFi.softAP("IoT Agriculture", "SMKN6BDG");
+        wm.setHostname("IoT Agriculture");
+    
+        wm.startConfigPortal("IoT Agriculture", "SMKN6BDG");
+    } else {
+        Serial.println("WiFiMgr: Connected to WiFi!");
+        xEventGroupSetBits(wifiEventGroup, WIFI_CONNECTED_BIT);
+        setTaskStates(true);
+    }
+
+    bool wasConnected = (WiFi.status() == WL_CONNECTED);
+
+    for (;;) {
+        wm.process();
+
+        bool isConnected = (WiFi.status() == WL_CONNECTED);
+
+        if (isConnected && !wasConnected) {
+            Serial.println("WiFiMgr: Connected to network!");
+            xEventGroupSetBits(wifiEventGroup, WIFI_CONNECTED_BIT);
+            setTaskStates(true);
+        } else if (!isConnected && wasConnected) {
+            Serial.println("WiFiMgr: Lost Wi-Fi, reopening portal...");
+            xEventGroupClearBits(wifiEventGroup, WIFI_CONNECTED_BIT);
+            setTaskStates(false);
+
+            WiFi.mode(WIFI_AP);
+            WiFi.softAP("IoT Agriculture", "SMKN6BDG");
+            wm.setHostname("IoT Agriculture");
+            wm.startConfigPortal("IoT Agriculture", "SMKN6BDG");
+        }
+
+        wasConnected = isConnected;
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -168,6 +233,9 @@ void task_serial_print(void *pvParameters) {
     // EventType_t evt;
 
     for (;;) {
+
+        xEventGroupWaitBits(wifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+
         // if (xQueueReceive(eventQueue, &evt, portMAX_DELAY) != pdPASS) {
         //     continue;
         // }
