@@ -6,11 +6,15 @@
 #include <WiFiManager.h>
 #include <AHT20_BMP280.h>
 #include <ADS1115.h>
+#include <WiFiClient.h>
+#include <PubSubClient.h>
+#include <env.h>
 
 static EventGroupHandle_t wifiEventGroup;
+static SemaphoreHandle_t sensorMutex;
 #define WIFI_CONNECTED_BIT (1 << 0)
 
-TaskHandle_t xTaskWifiManager, xTaskSensorI2C, xTaskSensorAnalog, xTaskSerialPrint;
+TaskHandle_t xTaskWifiManager, xTaskSensorI2C, xTaskSensorAnalog, xTaskSerialPrint, xTaskMqtt;
 
 QueueHandle_t eventQueue;
 QueueHandle_t databaseQueue;
@@ -24,21 +28,29 @@ typedef struct {
     float pressure;
     float altitude;
     float soilMoisture1;
-    uint16_t soilMoisture2;
-    uint16_t soilMoisture3;
-    uint16_t soilMoisture4;
-    uint16_t soilMoisture5;
-    uint16_t airQuality;
-    uint16_t rainLevel;
+    float soilMoisture2;
+    float soilMoisture3;
+    float soilMoisture4;
+    float soilMoisture5;
+    float airQuality;
+    float rainLevel;
 } SensorData_t;
 
 SensorData_t sensorData;
+static SensorData_t lastSentData = {0};
+
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
 
 bool lastConnected = false;
 
+bool mqtt_connect();
+
+void sensor_init(void);
 void ads1115_init(void);
 
 void freertos_task_init(void);
+void freertos_semaphore_init(void);
 void freertos_queue_init(void);
 void freertos_event_init(void);
 
@@ -46,21 +58,23 @@ void read_analog_sensor(void);
 void read_i2c_sensor(void);
 void wifi_manager(void);
 
+String jsonFromSensor(const SensorData_t &d);
+
 void task_wifi_manager(void *pvParameters);
 void task_analog_sensor(void *pvParameters);
 void task_serial_print(void *pvParameters);
 void task_i2c_sensor(void *pvParameters);
+void task_mqtt(void *pvParameters);
 
 void setup() {
     WiFi.mode(WIFI_STA);
     Serial.begin(115200);
     Wire.begin();
 
-    ads1115_init();
-    if (!AHT20_Init()) Serial.println("AHT20 init failed!");
-    if (!BMP280_Init()) Serial.println("BMP280 init failed!");
+    sensor_init();
 
     freertos_event_init();
+    freertos_semaphore_init();
     freertos_queue_init();
     freertos_task_init();
 }
@@ -75,6 +89,10 @@ void freertos_queue_init(void){
 
 void freertos_event_init(void){
     wifiEventGroup = xEventGroupCreate();
+}
+
+void freertos_semaphore_init(void){
+    sensorMutex = xSemaphoreCreateMutex();
 }
 
 void freertos_task_init(void){
@@ -113,6 +131,31 @@ void freertos_task_init(void){
         2,
         &xTaskSensorI2C
     );
+
+    xTaskCreate(
+        task_mqtt,
+        "mqtt_task",
+        8192,
+        NULL,
+        3,
+        &xTaskMqtt
+    );
+}
+
+bool mqtt_connect() {
+    if (mqttClient.connected()) return true;
+
+    Serial.println("[MQTT] Connecting...");
+    char clientId[32];
+    snprintf(clientId, sizeof(clientId), "%s-%08X", DEVICE_ID, (uint32_t)esp_random());
+
+    if (mqttClient.connect(clientId)) {
+        Serial.println("[MQTT] Connected");
+        return true;
+    } else {
+        Serial.printf("[MQTT] Failed, rc=%d\n", mqttClient.state());
+        return false;
+    }
 }
 
 void setTaskStates(bool wifiConnected) {
@@ -127,6 +170,12 @@ void setTaskStates(bool wifiConnected) {
         // vTaskSuspend(xTaskActuator);
         vTaskSuspend(xTaskSerialPrint);
     }
+}
+
+void sensor_init(void){
+    ads1115_init();
+    if (!AHT20_Init()) Serial.println("AHT20 init failed!");
+    if (!BMP280_Init()) Serial.println("BMP280 init failed!");
 }
 
 void ads1115_init(void){
@@ -157,6 +206,37 @@ void read_i2c_sensor(void){
     sensorData.humidity = AHT20_Humidity;
     sensorData.pressure = BMP280_Pressure;
     sensorData.altitude = BMP280_Altitude;
+}
+
+String jsonFromSensor(const SensorData_t &d) {
+    char buf[512];
+    snprintf(buf, sizeof(buf),
+        "{\"device_id\":\"%s\","
+        "\"temperature\":%.2f,"
+        "\"humidity\":%.2f,"
+        "\"pressure\":%.2f,"
+        "\"altitude\":%.2f,"
+        "\"soilMoisture1\":%.2f,"
+        "\"soilMoisture2\":%.2f,"
+        "\"soilMoisture3\":%.2f,"
+        "\"soilMoisture4\":%.2f,"
+        "\"soilMoisture5\":%.2f,"
+        "\"airQuality\":%.2f,"
+        "\"rainLevel\":%.2f}",
+        DEVICE_ID,
+        d.temperature,
+        d.humidity,
+        d.pressure,
+        d.altitude,
+        d.soilMoisture1,
+        d.soilMoisture2,
+        d.soilMoisture3,
+        d.soilMoisture4,
+        d.soilMoisture5,
+        d.airQuality,
+        d.rainLevel
+    );
+    return String(buf);
 }
 
 void task_wifi_manager(void *pvParameters) {
@@ -217,14 +297,22 @@ void task_wifi_manager(void *pvParameters) {
 
 void task_analog_sensor(void *pvParameters) {
     for (;;) {
-        read_analog_sensor();
+        if(xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(50)) == pdTRUE){
+            read_analog_sensor();
+            xSemaphoreGive(sensorMutex);
+        }
+
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
 void task_i2c_sensor(void *pvParameters) {
     for (;;) {
-        read_i2c_sensor();
+        if(xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(50)) == pdTRUE){
+            read_i2c_sensor();
+            xSemaphoreGive(sensorMutex);
+        }
+
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
@@ -262,3 +350,76 @@ void task_serial_print(void *pvParameters) {
     }
 }
 
+void task_mqtt(void *pvParameters) {
+    xEventGroupWaitBits(wifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+
+    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+
+    uint32_t lastPublish = 0;
+    uint32_t lastForce = 0;
+
+    for (;;) {
+        if (WiFi.status() != WL_CONNECTED) {
+            Serial.println("[MQTT] Wi-Fi disconnected, waiting...");
+            xEventGroupWaitBits(wifiEventGroup, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+            mqttClient.disconnect();
+            continue;
+        }
+
+        // Connect to MQTT if needed
+        if (!mqttClient.connected()) {
+            if (!mqtt_connect()) {
+                vTaskDelay(pdMS_TO_TICKS(3000));
+                continue;
+            }
+        }
+
+        mqttClient.loop();
+
+        // read sensor snapshot safely
+        SensorData_t copy;
+        if (sensorMutex && xSemaphoreTake(sensorMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            copy = sensorData;
+            xSemaphoreGive(sensorMutex);
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
+        uint32_t now = millis();
+        bool shouldPublish = false;
+
+        // compare with last sent values
+        if (fabs(copy.temperature - lastSentData.temperature) >= TEMP_THRESHOLD ||
+            fabs(copy.humidity - lastSentData.humidity) >= HUM_THRESHOLD ||
+            fabs(copy.pressure - lastSentData.pressure) >= PRESS_THRESHOLD ||
+            fabs(copy.soilMoisture1 - lastSentData.soilMoisture1) >= SOIL_THRESHOLD ||
+            abs((int)copy.airQuality - (int)lastSentData.airQuality) >= AIRQ_THRESHOLD ||
+            abs((int)copy.rainLevel - (int)lastSentData.rainLevel) >= RAIN_THRESHOLD) {
+            shouldPublish = true;
+        }
+
+        // periodic forced publish
+        if (now - lastForce >= MQTT_FORCE_MS) {
+            shouldPublish = true;
+            lastForce = now;
+        }
+
+        if (shouldPublish && (now - lastPublish) >= MQTT_COOLDOWN_MS) {
+            String payload = jsonFromSensor(copy);
+
+            if (mqttClient.publish(MQTT_TOPIC, payload.c_str())) {
+                Serial.print("[MQTT] Published: ");
+                Serial.println(payload);
+                lastSentData = copy;
+            } else {
+                Serial.println("[MQTT] Publish failed");
+            }
+
+            lastPublish = now;
+        }
+
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
