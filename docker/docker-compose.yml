@@ -1,0 +1,40 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: always
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: iot_data
+      MYSQL_USER: iotuser
+      MYSQL_PASSWORD: iotpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mariadb_data:/var/lib/mysql
+
+  bridge:
+    build: ./bridge
+    container_name: mqtt_bridge
+    depends_on:
+      - mosquitto
+      - mariadb
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_TOPIC: esp32/data
+      DB_HOST: mariadb
+      DB_USER: iotuser
+      DB_PASSWORD: iotpass
+      DB_NAME: iot_data

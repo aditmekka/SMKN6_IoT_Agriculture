@@ -18,3 +18,16 @@ Thumbs.db
 releases/   git
 
 env.h
+
+# Docker runtime data
+mariadb_data/
+mosquitto/data/
+mosquitto/log/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE files
+.vscode/
+.idea/
