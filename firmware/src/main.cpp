@@ -14,7 +14,7 @@ static EventGroupHandle_t wifiEventGroup;
 static SemaphoreHandle_t sensorMutex;
 #define WIFI_CONNECTED_BIT (1 << 0)
 
-TaskHandle_t xTaskWifiManager, xTaskSensorI2C, xTaskSensorAnalog, xTaskSerialPrint, xTaskMqtt;
+TaskHandle_t xTaskWifiManager, xTaskSensorI2C, xTaskSensorAnalog, xTaskSerialPrint, xTaskMqtt, xTaskActuator;
 
 QueueHandle_t eventQueue;
 QueueHandle_t databaseQueue;
@@ -65,6 +65,7 @@ void task_analog_sensor(void *pvParameters);
 void task_serial_print(void *pvParameters);
 void task_i2c_sensor(void *pvParameters);
 void task_mqtt(void *pvParameters);
+void task_actuator(void *pvParameters);
 
 void setup() {
     WiFi.mode(WIFI_STA);
@@ -139,6 +140,15 @@ void freertos_task_init(void){
         NULL,
         3,
         &xTaskMqtt
+    );
+
+    xTaskCreate(
+        task_actuator,
+        "actuator_task",
+        2048,
+        NULL,
+        4,
+        &xTaskActuator
     );
 }
 
@@ -421,5 +431,12 @@ void task_mqtt(void *pvParameters) {
 
 
         vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+void task_actuator(void *pvParameters){
+    for(;;){
+        //PLACEHOLDER
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
 }
