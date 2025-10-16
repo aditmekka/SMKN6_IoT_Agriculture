@@ -38,3 +38,33 @@ services:
       DB_USER: iotuser
       DB_PASSWORD: iotpass
       DB_NAME: iot_data
+
+  laravel-app:
+    build:
+      context: ./laravel
+      dockerfile: Dockerfile
+    container_name: laravel-app
+    volumes:
+      - ./laravel:/var/www/html
+    depends_on:
+      - mariadb
+    ports:
+      - "8000:80"
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_DATABASE: iot_data
+      DB_USERNAME: iotuser
+      DB_PASSWORD: iotpass
+      
+  laravel-web:
+    image: nginx:latest
+    container_name: laravel-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./laravel:/var/www/html
+      - ./laravel/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - laravel-app
