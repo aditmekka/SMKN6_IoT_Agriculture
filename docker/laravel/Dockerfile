@@ -11,6 +11,11 @@ WORKDIR /var/www/html
 # Copy existing Laravel files
 COPY . .
 
+# Create directories and set permissions
+RUN mkdir -p bootstrap/cache storage \
+    && chmod -R 775 bootstrap/cache storage \
+    && chown -R www-data:www-data bootstrap/cache storage
+
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
