@@ -27,7 +27,6 @@ Thumbs.db
 
 # === Laravel Specific ===
 /public/storage
-/public/build
 /public/hot
 /storage/*.key
 /storage/pail
