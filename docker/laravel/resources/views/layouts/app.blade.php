@@ -94,11 +94,9 @@
 
         <!-- Main content -->
         <div class="flex-1 flex flex-col main-bg">
-            <main class="flex-1 p-6">
-                <div class="content-card">
-                    {{ $slot }}
-                </div>
-            </main>
+<main class="flex-1 p-6">
+    {{ $slot }}
+</main>
         </div>
     </div>
 </body>
