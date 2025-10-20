@@ -1,29 +1,35 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Profile') }}
-        </h2>
-    </x-slot>
+@extends('layouts.app')
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <div class="p-4 sm:p-8 bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-profile-information-form')
-                </div>
-            </div>
+@section('content')
+<div class="text-center relative overflow-hidden flex flex-col items-center justify-center min-h-[calc(100vh-100px)]">
+    <h1 class="text-2xl font-bold text-blue-700 mb-8 flex justify-center items-center gap-2">
+        Keamanan 🔒
+    </h1>
 
-            <div class="p-4 sm:p-8 bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-password-form')
-                </div>
-            </div>
+    <div class="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-8 w-full max-w-4xl flex flex-col md:flex-row gap-6 justify-center items-start transition-all duration-500 hover:shadow-2xl">
 
-            <div class="p-4 sm:p-8 bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.delete-user-form')
-                </div>
-            </div>
+        {{-- Kiri: Ubah Password --}}
+        <div class="bg-white rounded-xl shadow-md p-5 flex-1">
+            @include('profile.partials.update-password-form')
+        </div>
+
+        {{-- Divider garis vertikal --}}
+        <div class="hidden md:block w-px bg-gray-300"></div>
+
+        {{-- Kanan: Hapus Akun --}}
+        <div class="bg-white rounded-xl shadow-md p-5 flex-1">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span>⚠️</span> Hapus Akun
+            </h2>
+            @include('profile.partials.delete-user-form')
         </div>
     </div>
-</x-app-layout>
+
+    <div class="mt-8">
+        <a href="{{ route('settings') }}"
+           class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition shadow-md hover:shadow-lg text-sm">
+           Kembali ke Settings
+        </a>
+    </div>
+</div>
+@endsection

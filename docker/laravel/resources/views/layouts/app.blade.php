@@ -14,7 +14,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <style>
-        /* === Full background seluruh layar kanan === */
+        /* Background */
         .main-bg {
             background-image: url('{{ asset("assets/images/Background.png") }}');
             background-size: cover;
@@ -23,7 +23,7 @@
             min-height: 100vh;
         }
 
-        /* Sidebar transparan biar nyatu */
+        /* Sidebar */
         aside {
             background-color: rgba(31, 41, 55, 0.95);
             backdrop-filter: blur(6px);
@@ -32,13 +32,14 @@
             justify-content: space-between;
         }
 
-        /* Kontainer isi (biar konten tetap kebaca) */
+        /* Kontainer isi (biar konten tetap kebaca) 
         .content-card {
             background-color: rgba(255, 255, 255, 0.85);
             border-radius: 1rem;
             padding: 2rem;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
+        */
 
         /* Bagian bawah sidebar (user info) */
         .user-section {
@@ -71,9 +72,9 @@
                        class="block px-6 py-3 hover:bg-gray-700/60">
                        Device Control
                     </a>
-                    <a href="#"
-                       class="block px-6 py-3 hover:bg-gray-700/60">
-                       Settings
+                    <a href="{{ route('settings') }}"
+                        class="block px-6 py-3 hover:bg-gray-700/60 {{ request()->routeIs('settings') ? 'bg-gray-700/80' : '' }}">
+                        Settings
                     </a>
                 </nav>
             </div>
@@ -92,12 +93,12 @@
                     </div>
         </aside>
 
-        <!-- Main content -->
-        <div class="flex-1 flex flex-col main-bg">
-<main class="flex-1 p-6">
-    {{ $slot }}
-</main>
-        </div>
+                    <!-- Main content -->
+            <div class="flex-1 flex flex-col main-bg">
+                <main class="flex-1 p-6">
+                    @yield('content')
+                </main>
+            </div>
     </div>
 </body>
 </html>
