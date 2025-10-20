@@ -19,6 +19,7 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
+        "flag-icons": "^7.5.0",
         "flowbite": "^3.1.2"
     }
 }
