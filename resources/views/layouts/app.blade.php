@@ -59,24 +59,34 @@
                 <div class="p-6 text-2xl font-bold border-b border-gray-700">
                     AQUA
                 </div>
-                <nav class="mt-4">
-                    <a href="{{ route('dashboard') }}"
-                       class="block px-6 py-3 hover:bg-gray-700/60 {{ request()->routeIs('dashboard') ? 'bg-gray-700/80' : '' }}">
-                       Dashboard
-                    </a>
-                    <a href="#"
-                       class="block px-6 py-3 hover:bg-gray-700/60">
-                       Sensor Data
-                    </a>
-                    <a href="#"
-                       class="block px-6 py-3 hover:bg-gray-700/60">
-                       Device Control
-                    </a>
-                    <a href="{{ route('settings') }}"
-                        class="block px-6 py-3 hover:bg-gray-700/60 {{ request()->routeIs('settings') ? 'bg-gray-700/80' : '' }}">
-                        Settings
-                    </a>
-                </nav>
+                    <nav class="mt-4">
+                        <!-- Dashboard -->
+                        <a href="{{ route('dashboard') }}"
+                        class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
+                        {{ request()->routeIs('dashboard') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
+                            Dashboard
+                        </a>
+
+                        <!-- Sensor Data -->
+                        <a href="{{ route('sensor.data') }}"
+                        class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
+                        {{ request()->routeIs('sensor.data') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
+                            Sensor Data
+                        </a>
+
+                        <!-- Device Control -->
+                        <a href="#"
+                        class="block px-6 py-3 rounded hover:bg-gray-700/60 transition text-gray-300">
+                            Device Control
+                        </a>
+
+                        <!-- Settings -->
+                        <a href="{{ route('settings') }}"
+                        class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
+                        {{ request()->routeIs('settings') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
+                            Settings
+                        </a>
+                    </nav>
             </div>
 
                 <!-- Bagian bawah: nama user + tombol logout -->
