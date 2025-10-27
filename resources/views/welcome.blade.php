@@ -132,7 +132,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="title">🌊 AQUA</div>
+        <div class="title">AQUA</div>
         <div class="subtitle">Automatic Quality Utility for Agriculture</div>
 
         @if (Route::has('login'))

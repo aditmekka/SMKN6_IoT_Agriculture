@@ -32,15 +32,6 @@
             justify-content: space-between;
         }
 
-        /* Kontainer isi (biar konten tetap kebaca) 
-        .content-card {
-            background-color: rgba(255, 255, 255, 0.85);
-            border-radius: 1rem;
-            padding: 2rem;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-        */
-
         /* Bagian bawah sidebar (user info) */
         .user-section {
             background-color: #2563eb; /* biru */
@@ -48,6 +39,22 @@
             padding: 1rem;
             font-weight: 500;
             border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* ====== Animasi Fade-In Smooth ====== */
+        @keyframes fadeInUp {
+            0% {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out both;
         }
     </style>
 </head>
@@ -59,56 +66,57 @@
                 <div class="p-6 text-2xl font-bold border-b border-gray-700">
                     AQUA
                 </div>
-                    <nav class="mt-4">
-                        <!-- Dashboard -->
-                        <a href="{{ route('dashboard') }}"
-                        class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
-                        {{ request()->routeIs('dashboard') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
-                            Dashboard
-                        </a>
+                <nav class="mt-4">
+                    <!-- Dashboard -->
+                    <a href="{{ route('dashboard') }}"
+                       class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
+                       {{ request()->routeIs('dashboard') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
+                        Dashboard
+                    </a>
 
-                        <!-- Sensor Data -->
-                        <a href="{{ route('sensor.data') }}"
-                        class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
-                        {{ request()->routeIs('sensor.data') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
-                            Sensor Data
-                        </a>
+                    <!-- Sensor Data -->
+                    <a href="{{ route('sensor.data') }}"
+                       class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
+                       {{ request()->routeIs('sensor.data') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
+                        Sensor Data
+                    </a>
 
-                        <!-- Device Control -->
-                        <a href="#"
-                        class="block px-6 py-3 rounded hover:bg-gray-700/60 transition text-gray-300">
-                            Device Control
-                        </a>
+                    <!-- Device Control -->
+                    <a href="{{ route('device-control') }}"
+                       class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
+                       {{ request()->routeIs('device-control') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
+                        Device Control
+                    </a>
 
-                        <!-- Settings -->
-                        <a href="{{ route('settings') }}"
-                        class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
-                        {{ request()->routeIs('settings') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
-                            Settings
-                        </a>
-                    </nav>
+                    <!-- Settings -->
+                    <a href="{{ route('settings') }}"
+                       class="block px-6 py-3 rounded hover:bg-gray-700/60 transition 
+                       {{ request()->routeIs('settings') ? 'bg-gray-700/80 text-white' : 'text-gray-300' }}">
+                        Settings
+                    </a>
+                </nav>
             </div>
 
-                <!-- Bagian bawah: nama user + tombol logout -->
-                    <div class="user-section flex flex-col items-center space-y-2">
-                        <div>👤 {{ Auth::user()->name }}</div>
+            <!-- Bagian bawah: nama user + tombol logout -->
+            <div class="user-section flex flex-col items-center space-y-2">
+                <div>👤 {{ Auth::user()->name }}</div>
 
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit"
-                                class="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">
-                                Logout
-                            </button>
-                        </form>
-                    </div>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit"
+                        class="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition duration-200">
+                        Logout
+                    </button>
+                </form>
+            </div>
         </aside>
 
-                    <!-- Main content -->
-            <div class="flex-1 flex flex-col main-bg">
-                <main class="flex-1 p-6">
-                    @yield('content')
-                </main>
-            </div>
+        <!-- Main content -->
+        <div class="flex-1 flex flex-col main-bg">
+            <main class="flex-1 p-6">
+                @yield('content')
+            </main>
+        </div>
     </div>
 </body>
 </html>
